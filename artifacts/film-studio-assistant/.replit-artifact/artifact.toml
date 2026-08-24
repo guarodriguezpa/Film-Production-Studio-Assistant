@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Film Production Studio Assistant"
+description = "A production planning workspace that reads scene text, extracts props, and matches them against inventory availability and daily rental costs."
+version = "1.0.0"
+id = "artifacts/film-studio-assistant"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22111
+
+[services.development]
+run = "pnpm --filter @workspace/film-studio-assistant run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/film-studio-assistant", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/film-studio-assistant/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22111"
+BASE_PATH = "/"

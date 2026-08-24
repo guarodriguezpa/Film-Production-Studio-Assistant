@@ -1,0 +1,1 @@
+- [API codegen Zod compatibility](api-codegen-zod-compatibility.md) — OpenAPI integer schemas may generate unsupported zod.int calls in this workspace's Zod runtime.

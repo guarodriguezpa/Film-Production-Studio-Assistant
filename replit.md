@@ -1,10 +1,11 @@
-# [Project name]
+# Film Production Studio Assistant
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Filmhouse turns screenplay scene text into a production-ready prop pull list with inventory status and daily rental cost.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/film-studio-assistant run dev` — run the studio dashboard
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,15 +23,22 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/film-studio-assistant/src/pages/studio-home.tsx` — scene intake, analysis report, filters, and CSV export
+- `artifacts/api-server/src/routes/production.ts` — scene parsing and inventory matching API
+- `lib/api-spec/openapi.yaml` — source of truth for the scene analysis contract
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The dashboard calls the shared API through generated React Query hooks rather than embedding parsing logic in the browser.
+- Inventory matching is isolated behind the production route so a live ClickHouse adapter can replace the starter inventory without changing the UI contract.
+- The initial experience ships with a small representative inventory set so coordinators can try the full flow before connecting a warehouse.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Paste screenplay text and load an example scene.
+- Extract props and identify location/title context.
+- Show daily rental cost, requested quantity, on-hand stock, condition, category, matched term, and status.
+- Filter the pull list by availability and export it as CSV.
 
 ## User preferences
 

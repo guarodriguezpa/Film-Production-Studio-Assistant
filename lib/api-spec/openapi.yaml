@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: production
+    description: Film production planning operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /production/scene-analysis:
+    post:
+      operationId: analyzeScene
+      tags: [production]
+      summary: Extract scene inventory requirements
+      description: Parses screenplay text and matches required props against studio inventory.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SceneAnalysisInput"
+      responses:
+        "200":
+          description: Scene analysis and inventory availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SceneAnalysis"
+        "400":
+          description: Invalid scene text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +60,45 @@ components:
           type: string
       required:
         - status
+    SceneAnalysisInput:
+      type: object
+      required:
+        - sceneText
+      properties:
+        sceneText:
+          type: string
+          minLength: 10
+    InventoryItem:
+      type: object
+      required: [id, name, category, dailyCost, stock, status, requestedQty]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        dailyCost: { type: number }
+        stock: { type: number }
+        status:
+          type: string
+          enum: [Available, "In Repair", "Unavailable"]
+        requestedQty: { type: number }
+        condition: { type: string }
+        matchedTerm: { type: string }
+    SceneAnalysis:
+      type: object
+      required: [sceneTitle, location, extractedCount, availableCount, totalDailyCost, items]
+      properties:
+        sceneTitle: { type: string }
+        location: { type: string }
+        extractedCount: { type: number }
+        availableCount: { type: number }
+        totalDailyCost: { type: number }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryItem"
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
 
