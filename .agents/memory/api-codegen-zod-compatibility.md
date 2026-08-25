@@ -8,3 +8,5 @@ When adding OpenAPI contracts, prefer numeric schemas with explicit application-
 **Why:** The current generated validator runtime is Zod 3 while the generator can emit the newer zod.int helper, causing library typecheck failures after otherwise successful codegen.
 
 **How to apply:** After changing OpenAPI numeric fields, run codegen and the library typecheck before implementing routes; if zod.int appears, adjust the contract rather than hand-editing generated files.
+
+The Google Gemini endpoint may reject `gemini-2.5-flash` for newly provisioned accounts with a model-retirement 404; preserve the requested model as the first attempt and use the provider's suggested replacement only for that explicit error.

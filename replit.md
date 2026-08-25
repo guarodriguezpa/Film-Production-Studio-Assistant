@@ -32,6 +32,7 @@ Filmhouse turns screenplay scene text into a production-ready prop pull list wit
 - The dashboard calls the shared API through generated React Query hooks rather than embedding parsing logic in the browser.
 - Inventory matching is isolated behind the production route so a live ClickHouse adapter can replace the starter inventory without changing the UI contract.
 - The initial experience ships with a small representative inventory set so coordinators can try the full flow before connecting a warehouse.
+- Gemini analysis uses the official Python `google-genai` SDK with `gemini-2.5-flash` as the requested primary model and a provider-compatible fallback when Google retires that model for a new account.
 
 ## Product
 
