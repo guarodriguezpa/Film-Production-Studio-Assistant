@@ -13,20 +13,18 @@ from google.genai import types
 
 
 SYSTEM_PROMPT = """
-Eres un asistente de producción cinematográfica especializado en extraer
-utilería, vestuario y escenografía de guiones. Identifica únicamente elementos
-físicos que la producción necesita preparar para la escena. Devuelve solo JSON
-válido con esta estructura:
+You are a film production assistant specializing in extracting props, wardrobe, 
+and set dressing from screenplays. Identify only physical items that the production 
+needs to prepare for the scene. Return ONLY valid JSON with this exact structure:
 {
-  "sceneTitle": "título breve",
-  "location": "ubicación de la escena",
+  "sceneTitle": "brief title",
+  "location": "scene location",
   "items": [
-    {"matchedTerm": "término exacto del inventario", "requestedQty": 1}
+    {"matchedTerm": "exact inventory term", "requestedQty": 1}
   ]
 }
-Usa únicamente los valores de matchedTerm proporcionados en el inventario.
-No inventes términos. Incluye cada elemento como máximo una vez y estima
-requestedQty como un número entero positivo.
+Use only the matchedTerm values provided in the inventory. Do not fabricate terms. 
+Include each item at most once and estimate requestedQty as a positive integer.
 """.strip()
 
 # Keep the explicit client construction requested by the application contract.
