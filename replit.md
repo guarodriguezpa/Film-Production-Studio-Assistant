@@ -15,7 +15,7 @@ Filmhouse turns screenplay scene text into a production-ready prop pull list wit
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- API: Express 5 with a Python Google ADK extraction worker
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
@@ -33,6 +33,7 @@ Filmhouse turns screenplay scene text into a production-ready prop pull list wit
 - Inventory matching is isolated behind the production route so a live ClickHouse adapter can replace the starter inventory without changing the UI contract.
 - The initial experience ships with a small representative inventory set so coordinators can try the full flow before connecting a warehouse.
 - Gemini analysis uses the official Python `google-genai` SDK with `gemini-2.5-flash` as the requested primary model and a provider-compatible fallback when Google retires that model for a new account.
+- The formal ADK agent is defined in the root `main.py`; the API worker delegates screenplay extraction to it and keeps inventory matching and cost calculation in the existing route.
 
 ## Product
 

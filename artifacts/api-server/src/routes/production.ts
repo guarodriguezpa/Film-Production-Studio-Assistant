@@ -83,7 +83,10 @@ router.post("/production/scene-analysis", async (req, res) => {
 
   const items = (extraction.items ?? []).flatMap((match) => {
     const matchedTerm = match.matchedTerm?.toLowerCase();
-    const item = inventory.find((candidate) => candidate.terms.some((term) => term.toLowerCase() === matchedTerm));
+    const item = inventory.find((candidate) =>
+      candidate.name.toLowerCase() === matchedTerm ||
+      candidate.terms.some((term) => term.toLowerCase() === matchedTerm),
+    );
     if (!item) return [];
     return [{
       id: item.id,
