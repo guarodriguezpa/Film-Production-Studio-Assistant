@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { AnalyzeSceneBody, AnalyzeSceneResponse } from "@workspace/api-zod";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { createClient } from "@clickhouse/client"; // Cliente oficial de ClickHouse para Node
 
 type InventoryRecord = {
   id: string;
@@ -14,19 +15,40 @@ type InventoryRecord = {
   terms: string[];
 };
 
-// This adapter mirrors the columns expected from the ClickHouse inventory table.
-// It keeps the first-run experience useful when a studio has not connected a
-// warehouse yet; the query boundary is intentionally isolated for easy wiring.
-const inventory: InventoryRecord[] = [
-  { id: "prop-001", name: "Vintage Typewriter", category: "Props", dailyCost: 85, stock: 2, status: "Available", condition: "Good", terms: ["typewriter", "olivetti"] },
-  { id: "prop-002", name: "Desk Lamp", category: "Lighting", dailyCost: 35, stock: 5, status: "Available", condition: "Excellent", terms: ["desk lamp", "lamp"] },
-  { id: "prop-003", name: "Rotary Telephone", category: "Props", dailyCost: 65, stock: 1, status: "Available", condition: "Good", terms: ["telephone", "phone"] },
-  { id: "prop-004", name: "Wooden Writing Desk", category: "Furniture", dailyCost: 120, stock: 1, status: "Available", condition: "Excellent", terms: ["writing desk", "desk"] },
-  { id: "prop-005", name: "Leather Armchair", category: "Furniture", dailyCost: 145, stock: 0, status: "In Repair", condition: "Repair in progress", terms: ["armchair", "chair"] },
-  { id: "prop-006", name: "1950s Suitcase", category: "Props", dailyCost: 48, stock: 3, status: "Available", condition: "Good", terms: ["suitcase", "luggage"] },
-  { id: "prop-007", name: "Pocket Watch", category: "Wardrobe", dailyCost: 28, stock: 2, status: "Available", condition: "Excellent", terms: ["pocket watch", "watch"] },
-  { id: "prop-008", name: "Film Camera", category: "Camera", dailyCost: 210, stock: 0, status: "Unavailable", condition: "Checked out", terms: ["film camera", "camera"] },
-];
+// Inicializamos el cliente de ClickHouse usando las variables de entorno de tu proyecto
+const clickhouse = createClient({
+  url: process.env.CLICKHOUSE_HOST || process.env.CLICKHOUSE_URL,
+  username: process.env.CLICKHOUSE_USER || "default",
+  password: process.env.CLICKHOUSE_PASSWORD || "",
+});
+
+// Función para obtener el inventario directamente desde la base de datos ClickHouse
+async function fetchInventoryFromClickHouse(): Promise<InventoryRecord[]> {
+  try {
+    const resultSet = await clickhouse.query({
+      query: 'SELECT item_id, item_name, category, daily_rent_cost, stock_available, warehouse_location FROM prop_inventory',
+      format: 'JSONEachRow',
+    });
+    const rows = await resultSet.json<any[]>();
+
+    // Mapeamos los campos de ClickHouse al formato que espera tu aplicación
+    return rows.map((row, index) => ({
+      id: row.item_id || `prop-${index + 1}`,
+      name: row.item_name,
+      category: row.category || "Props",
+      dailyCost: Number(row.daily_rent_cost) || 50,
+      stock: Number(row.stock_available) || 1,
+      status: Number(row.stock_available) > 0 ? "Available" : "Unavailable",
+      condition: "Good",
+      // Generamos los términos de búsqueda automáticamente a partir del nombre del ítem
+      terms: [row.item_name.toLowerCase(), row.item_name.split(" ")[0].toLowerCase()]
+    }));
+  } catch (error) {
+    console.error("Error consultando ClickHouse, usando respaldo:", error);
+    // Si llegara a fallar la red, devolvemos un arreglo vacío para evitar caídas
+    return [];
+  }
+}
 
 type GeminiExtraction = {
   sceneTitle?: string;
@@ -34,7 +56,7 @@ type GeminiExtraction = {
   items?: Array<{ matchedTerm?: string; requestedQty?: number }>;
 };
 
-const extractWithGemini = (sceneText: string): Promise<GeminiExtraction> =>
+const extractWithGemini = (sceneText: string, inventoryList: InventoryRecord[]): Promise<GeminiExtraction> =>
   new Promise((resolve, reject) => {
     const python = spawn("python", [path.resolve(process.cwd(), "python/scene_analyzer.py")], {
       env: process.env,
@@ -59,7 +81,7 @@ const extractWithGemini = (sceneText: string): Promise<GeminiExtraction> =>
     });
     python.stdin.write(JSON.stringify({
       sceneText,
-      inventory: inventory.flatMap((item) => item.terms.map((term) => ({ term, item: item.name }))),
+      inventory: inventoryList.flatMap((item) => item.terms.map((term) => ({ term, item: item.name }))),
     }));
     python.stdin.end();
   });
@@ -73,9 +95,12 @@ router.post("/production/scene-analysis", async (req, res) => {
     return;
   }
 
+  // 1. Consultamos el inventario en vivo desde ClickHouse en cada petición
+  const inventory = await fetchInventoryFromClickHouse();
+
   let extraction: GeminiExtraction;
   try {
-    extraction = await extractWithGemini(parsed.data.sceneText);
+    extraction = await extractWithGemini(parsed.data.sceneText, inventory);
   } catch {
     res.status(502).json({ error: "Gemini could not analyze this scene. Please try again." });
     return;
