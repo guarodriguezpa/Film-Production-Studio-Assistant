@@ -11,19 +11,18 @@ from google.adk.models import Gemini
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
-# 1. El prompt ahora extrae TODOS los objetos físicos, sin restricciones de inventario.
 SYSTEM_PROMPT = """
 You are a film production assistant specializing in extracting props, wardrobe, 
-and set dressing from screenplays. Identify ALL physical items that the production 
+and set dressing from screenplays. Identify only physical items that the production 
 needs to prepare for the scene. Return ONLY valid JSON with this exact structure:
 {
   "sceneTitle": "brief title",
   "location": "scene location",
   "items": [
-    {"matchedTerm": "extracted item name (lowercase)", "requestedQty": 1}
+    {"matchedTerm": "exact inventory term", "requestedQty": 1}
   ]
 }
-Extract the exact item names as simple terms in lowercase. 
+Use only the matchedTerm values provided in the inventory. Do not fabricate terms. 
 Include each item at most once and estimate requestedQty as a positive integer.
 """.strip()
 
@@ -38,7 +37,7 @@ class StudioGemini(Gemini):
 root_agent = Agent(
     name="film_production_prop_agent",
     model=StudioGemini(model="gemini-2.5-flash"),
-    description="Extracts all film production props, wardrobe, and set dressing from screenplay scenes.",
+    description="Extracts film production props, wardrobe, and set dressing from screenplay scenes.",
     instruction=SYSTEM_PROMPT,
     generate_content_config=types.GenerateContentConfig(
         response_mime_type="application/json",
@@ -77,11 +76,14 @@ async def _run_agent(agent: Agent, prompt: str) -> dict[str, Any]:
             return json.loads(text)
     raise RuntimeError("The ADK agent did not return a final response.")
 
-# 2. Eliminamos el parámetro 'inventory' de la función. El agente ahora vuela solo.
-async def analyze_scene(scene_text: str) -> dict[str, Any]:
+async def analyze_scene(scene_text: str, inventory: list[dict[str, str]]) -> dict[str, Any]:
     """Run the formal ADK agent and return its structured extraction."""
-    prompt = f"Guion de la escena:\n{scene_text}"
-
+    prompt = (
+        "Inventario disponible:\n"
+        f"{json.dumps(inventory, ensure_ascii=False)}\n\n"
+        "Guion de la escena:\n"
+        f"{scene_text}"
+    )
     try:
         return await _run_agent(root_agent, prompt)
     except Exception as error:
@@ -89,10 +91,9 @@ async def analyze_scene(scene_text: str) -> dict[str, Any]:
             raise
         return await _run_agent(fallback_agent, prompt)
 
-# 3. Solo recibimos el texto de la escena.
 def main() -> None:
     payload = json.loads(sys.stdin.read())
-    result = asyncio.run(analyze_scene(payload["sceneText"]))
+    result = asyncio.run(analyze_scene(payload["sceneText"], payload["inventory"]))
     print(json.dumps(result, ensure_ascii=False))
 
 if __name__ == "__main__":
