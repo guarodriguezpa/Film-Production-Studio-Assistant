@@ -11,38 +11,34 @@ from google.adk.models import Gemini
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
-
+# 1. El prompt ahora extrae TODOS los objetos físicos, sin restricciones de inventario.
 SYSTEM_PROMPT = """
 You are a film production assistant specializing in extracting props, wardrobe, 
-and set dressing from screenplays. Identify only physical items that the production 
+and set dressing from screenplays. Identify ALL physical items that the production 
 needs to prepare for the scene. Return ONLY valid JSON with this exact structure:
 {
   "sceneTitle": "brief title",
   "location": "scene location",
   "items": [
-    {"matchedTerm": "exact inventory term", "requestedQty": 1}
+    {"matchedTerm": "extracted item name (lowercase)", "requestedQty": 1}
   ]
 }
-Use only the matchedTerm values provided in the inventory. Do not fabricate terms. 
+Extract the exact item names as simple terms in lowercase. 
 Include each item at most once and estimate requestedQty as a positive integer.
 """.strip()
 
-# Keep the explicit client construction requested by the application contract.
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-
 
 class StudioGemini(Gemini):
     """ADK Gemini model that reuses the app's explicitly configured client."""
-
     @property
     def api_client(self) -> genai.Client:
         return client
 
-
 root_agent = Agent(
     name="film_production_prop_agent",
     model=StudioGemini(model="gemini-2.5-flash"),
-    description="Extracts film production props, wardrobe, and set dressing from screenplay scenes.",
+    description="Extracts all film production props, wardrobe, and set dressing from screenplay scenes.",
     instruction=SYSTEM_PROMPT,
     generate_content_config=types.GenerateContentConfig(
         response_mime_type="application/json",
@@ -58,7 +54,6 @@ fallback_agent = Agent(
         response_mime_type="application/json",
     ),
 )
-
 
 async def _run_agent(agent: Agent, prompt: str) -> dict[str, Any]:
     runner = InMemoryRunner(agent=agent, app_name="film_production_studio")
@@ -82,31 +77,23 @@ async def _run_agent(agent: Agent, prompt: str) -> dict[str, Any]:
             return json.loads(text)
     raise RuntimeError("The ADK agent did not return a final response.")
 
-
-async def analyze_scene(scene_text: str, inventory: list[dict[str, str]]) -> dict[str, Any]:
+# 2. Eliminamos el parámetro 'inventory' de la función. El agente ahora vuela solo.
+async def analyze_scene(scene_text: str) -> dict[str, Any]:
     """Run the formal ADK agent and return its structured extraction."""
-    prompt = (
-        "Inventario disponible:\n"
-        f"{json.dumps(inventory, ensure_ascii=False)}\n\n"
-        "Guion de la escena:\n"
-        f"{scene_text}"
-    )
+    prompt = f"Guion de la escena:\n{scene_text}"
+
     try:
         return await _run_agent(root_agent, prompt)
     except Exception as error:
-        # Google currently retires gemini-2.5-flash for some new accounts.
-        # Keep it as the requested primary model and only fall back on the
-        # provider's explicit model-retirement response.
         if "no longer available" not in str(error):
             raise
         return await _run_agent(fallback_agent, prompt)
 
-
+# 3. Solo recibimos el texto de la escena.
 def main() -> None:
     payload = json.loads(sys.stdin.read())
-    result = asyncio.run(analyze_scene(payload["sceneText"], payload["inventory"]))
+    result = asyncio.run(analyze_scene(payload["sceneText"]))
     print(json.dumps(result, ensure_ascii=False))
-
 
 if __name__ == "__main__":
     try:
