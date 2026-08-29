@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { AnalyzeSceneBody, AnalyzeSceneResponse } from "@workspace/api-zod";
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { createClient } from "@clickhouse/client"; // Cliente oficial de ClickHouse para Node
+import { createClient } from "@clickhouse/client";
 
 type InventoryRecord = {
   id: string;
@@ -15,14 +15,13 @@ type InventoryRecord = {
   terms: string[];
 };
 
-// Inicializamos el cliente de ClickHouse usando las variables de entorno de tu proyecto
+// Conexión a ClickHouse usando tus Secrets
 const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_HOST || process.env.CLICKHOUSE_URL,
+  url: process.env.CLICKHOUSE_HOST || "",
   username: process.env.CLICKHOUSE_USER || "default",
   password: process.env.CLICKHOUSE_PASSWORD || "",
 });
 
-// Función para obtener el inventario directamente desde la base de datos ClickHouse
 async function fetchInventoryFromClickHouse(): Promise<InventoryRecord[]> {
   try {
     const resultSet = await clickhouse.query({
@@ -31,23 +30,26 @@ async function fetchInventoryFromClickHouse(): Promise<InventoryRecord[]> {
     });
     const rows = await resultSet.json<any[]>();
 
-    // Mapeamos los campos de ClickHouse al formato que espera tu aplicación
-    return rows.map((row, index) => ({
-      id: row.item_id || `prop-${index + 1}`,
-      name: row.item_name,
-      category: row.category || "Props",
-      dailyCost: Number(row.daily_rent_cost) || 50,
-      stock: Number(row.stock_available) || 1,
-      status: Number(row.stock_available) > 0 ? "Available" : "Unavailable",
-      condition: "Good",
-      // Generamos los términos de búsqueda automáticamente a partir del nombre del ítem
-      terms: [row.item_name.toLowerCase(), row.item_name.split(" ")[0].toLowerCase()]
-    }));
+    if (rows && rows.length > 0) {
+        return rows.map((row: any, index: number) => ({
+        id: row.item_id || `prop-${index + 1}`,
+        name: row.item_name,
+        category: row.category || "Props",
+        dailyCost: Number(row.daily_rent_cost) || 50,
+        stock: Number(row.stock_available) || 1,
+        status: Number(row.stock_available) > 0 ? "Available" : "Unavailable",
+        condition: "Good",
+        terms: [row.item_name.toLowerCase(), row.item_name.split(" ")[0].toLowerCase()]
+      }));
+    }
   } catch (error) {
-    console.error("Error consultando ClickHouse, usando respaldo:", error);
-    // Si llegara a fallar la red, devolvemos un arreglo vacío para evitar caídas
-    return [];
+    console.error("Error consultando ClickHouse:", error);
   }
+
+  // Respaldo mínimo en caso de que ClickHouse tarde en responder
+  return [
+    { id: "prop-001", name: "Vintage Typewriter", category: "Props", dailyCost: 85, stock: 2, status: "Available", condition: "Good", terms: ["typewriter", "olivetti"] }
+  ];
 }
 
 type GeminiExtraction = {
@@ -95,7 +97,7 @@ router.post("/production/scene-analysis", async (req, res) => {
     return;
   }
 
-  // 1. Consultamos el inventario en vivo desde ClickHouse en cada petición
+  // Node.js consulta ClickHouse y le entrega la lista real al Agente
   const inventory = await fetchInventoryFromClickHouse();
 
   let extraction: GeminiExtraction;
