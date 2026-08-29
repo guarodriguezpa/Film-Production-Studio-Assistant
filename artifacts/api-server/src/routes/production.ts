@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { AnalyzeSceneBody, AnalyzeSceneResponse } from "@workspace/api-zod";
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { createClient } from "@clickhouse/client";
+import https from "node:https";
 
 type InventoryRecord = {
   id: string;
@@ -15,40 +15,87 @@ type InventoryRecord = {
   terms: string[];
 };
 
-// Conexión a ClickHouse usando tus Secrets
-const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_HOST || "",
-  username: process.env.CLICKHOUSE_USER || "default",
-  password: process.env.CLICKHOUSE_PASSWORD || "",
-});
-
+// Función para consultar ClickHouse de forma nativa por HTTPS (sin requerir paquetes externos)
 async function fetchInventoryFromClickHouse(): Promise<InventoryRecord[]> {
-  try {
-    const resultSet = await clickhouse.query({
-      query: 'SELECT item_id, item_name, category, daily_rent_cost, stock_available, warehouse_location FROM prop_inventory',
-      format: 'JSONEachRow',
-    });
-    const rows = await resultSet.json<any[]>();
+  const hostUrl = process.env.CLICKHOUSE_HOST || "";
+  const user = process.env.CLICKHOUSE_USER || "default";
+  const password = process.env.CLICKHOUSE_PASSWORD || "";
 
-    if (rows && rows.length > 0) {
-        return rows.map((row: any, index: number) => ({
-        id: row.item_id || `prop-${index + 1}`,
-        name: row.item_name,
-        category: row.category || "Props",
-        dailyCost: Number(row.daily_rent_cost) || 50,
-        stock: Number(row.stock_available) || 1,
-        status: Number(row.stock_available) > 0 ? "Available" : "Unavailable",
-        condition: "Good",
-        terms: [row.item_name.toLowerCase(), row.item_name.split(" ")[0].toLowerCase()]
-      }));
-    }
-  } catch (error) {
-    console.error("Error consultando ClickHouse:", error);
+  if (!hostUrl) {
+    console.warn("CLICKHOUSE_HOST no está configurado, usando respaldo.");
+    return getFallbackInventory();
   }
 
-  // Respaldo mínimo en caso de que ClickHouse tarde en responder
+  return new Promise((resolve) => {
+    try {
+      const parsedUrl = new URL(hostUrl);
+      const query = 'SELECT item_id, item_name, category, daily_rent_cost, stock_available, warehouse_location FROM prop_inventory FORMAT JSONEachRow';
+
+      const options = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port || 8443,
+        path: parsedUrl.pathname === "/" ? "" : parsedUrl.pathname,
+        method: 'POST',
+        auth: `${user}:${password}`,
+        headers: {
+          'Content-Type': 'text/plain',
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode !== 200) {
+              console.error(`Error ClickHouse HTTP ${res.statusCode}: ${data}`);
+              resolve(getFallbackInventory());
+              return;
+            }
+
+            const rows = data.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+
+            if (rows && rows.length > 0) {
+                const mapped: InventoryRecord[] = rows.map((row: any, index: number) => ({
+                id: row.item_id || `prop-${index + 1}`,
+                name: row.item_name || "Unknown",
+                category: row.category || "Props",
+                dailyCost: Number(row.daily_rent_cost) || 50,
+                stock: Number(row.stock_available) || 1,
+                status: Number(row.stock_available) > 0 ? "Available" : "Unavailable",
+                condition: "Good",
+                terms: row.item_name ? [String(row.item_name).toLowerCase(), String(row.item_name).split(" ")[0].toLowerCase()] : []
+              }));
+              resolve(mapped);
+            } else {
+              resolve(getFallbackInventory());
+            }
+          } catch (e) {
+            console.error("Error parseando respuesta de ClickHouse:", e);
+            resolve(getFallbackInventory());
+          }
+        });
+      });
+
+      req.on('error', (e) => {
+        console.error("Error de conexión con ClickHouse:", e);
+        resolve(getFallbackInventory());
+      });
+
+      req.write(query);
+      req.end();
+    } catch (e) {
+      console.error("Error configurando petición a ClickHouse:", e);
+      resolve(getFallbackInventory());
+    }
+  });
+}
+
+function getFallbackInventory(): InventoryRecord[] {
   return [
-    { id: "prop-001", name: "Vintage Typewriter", category: "Props", dailyCost: 85, stock: 2, status: "Available", condition: "Good", terms: ["typewriter", "olivetti"] }
+    { id: "prop-001", name: "Vintage Typewriter", category: "Props", dailyCost: 85, stock: 2, status: "Available", condition: "Good", terms: ["typewriter", "olivetti"] },
+    { id: "prop-009", name: "Steel Handcuffs", category: "Safety", dailyCost: 15, stock: 4, status: "Available", condition: "Good", terms: ["handcuffs", "cuffs", "esposas"] },
+    { id: "prop-010", name: "Prop Handgun", category: "Weapons", dailyCost: 150, stock: 2, status: "Available", condition: "Excellent", terms: ["gun", "pistol", "revolver", "arma", "handgun"] }
   ];
 }
 
@@ -97,7 +144,6 @@ router.post("/production/scene-analysis", async (req, res) => {
     return;
   }
 
-  // Node.js consulta ClickHouse y le entrega la lista real al Agente
   const inventory = await fetchInventoryFromClickHouse();
 
   let extraction: GeminiExtraction;
