@@ -1,109 +1,37 @@
-import asyncio
-import json
 import os
 import sys
-import uuid
-from typing import Any, List
-from pydantic import BaseModel, Field
 
-from google import genai
-from google.adk.agents import Agent
-from google.adk.models import Gemini
-from google.adk.runners import InMemoryRunner
-from google.genai import types
+# 1. FORZAMOS A REPLIT A LEER LAS LIBRERÍAS (Como en tu arquitectura vieja)
+import clickhouse_connect
+import uvicorn
+from fastapi import FastAPI
+from pydantic import BaseModel
 
-# 1. Definir el esquema Pydantic para asegurar la estructura de la escena
-class PropItem(BaseModel):
-    matchedTerm: str = Field(..., description="Exact inventory term matched from the provided list.")
-    requestedQty: int = Field(..., ge=1, description="Positive integer quantity requested.")
+# 2. Conectamos la nueva arquitectura
+sys.path.append(os.path.join(os.path.dirname(__file__), ".agents", "01-orchestrator", "Scripts"))
 
-class SceneInventorySchema(BaseModel):
-    sceneTitle: str = Field(..., description="Brief title of the scene.")
-    location: str = Field(..., description="Scene location.")
-    items: List[PropItem] = Field(default_factory=list, description="List of physical items needed.")
+try:
+    from orchestrator import run_pipeline
+except ImportError as e:
+    print(f"Error cargando el orquestador: {e}")
+    sys.exit(1)
 
-SYSTEM_PROMPT = """
-You are a film production assistant specializing in extracting props, wardrobe, 
-and set dressing from screenplays. Identify only physical items that the production 
-needs to prepare for the scene. 
-Use only the matchedTerm values provided in the inventory. Do not fabricate terms. 
-Include each item at most once and estimate requestedQty as a positive integer.
-""".strip()
+# 3. Configurar la App
+app = FastAPI(title="Agentic Cinema API")
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+class ScenePayload(BaseModel):
+    sceneText: str
+    inventory: list
 
-class StudioGemini(Gemini):
-    """ADK Gemini model that reuses the app's explicitly configured client."""
-    @property
-    def api_client(self) -> genai.Client:
-        return client
-
-root_agent = Agent(
-    name="film_production_prop_agent",
-    model=StudioGemini(model="gemini-2.5-flash"),
-    description="Extracts film production props, wardrobe, and set dressing from screenplay scenes.",
-    instruction=SYSTEM_PROMPT,
-    # 2. Inyectar el schema Pydantic directamente en el agente del ADK
-    output_schema=SceneInventorySchema,
-)
-
-fallback_agent = Agent(
-    name="film_production_prop_agent_fallback",
-    model=StudioGemini(model="gemini-3.6-flash"),
-    description="Fallback film production prop extraction agent.",
-    instruction=SYSTEM_PROMPT,
-    output_schema=SceneInventorySchema,
-)
-
-async def _run_agent(agent: Agent, prompt: str) -> dict[str, Any]:
-    runner = InMemoryRunner(agent=agent, app_name="film_production_studio")
-    session_id = f"scene-{uuid.uuid4().hex}"
-    await runner.session_service.create_session(
-        app_name=runner.app_name,
-        user_id="studio-coordinator",
-        session_id=session_id,
-    )
-    message = types.Content(
-        role="user",
-        parts=[types.Part.from_text(text=prompt)],
-    )
-    async for event in runner.run_async(
-        user_id="studio-coordinator",
-        session_id=session_id,
-        new_message=message,
-    ):
-        if event.is_final_response() and event.content and event.content.parts:
-            text = event.content.parts[0].text or "{}"
-            parsed_data = json.loads(text)
-            # 3. Validar y serializar usando Pydantic para garantizar integridad
-            validated_output = SceneInventorySchema(**parsed_data)
-            return validated_output.model_dump()
-
-    raise RuntimeError("The ADK agent did not return a final response.")
-
-async def analyze_scene(scene_text: str, inventory: list[dict[str, str]]) -> dict[str, Any]:
-    """Run the formal ADK agent and return its structured extraction."""
-    prompt = (
-        "Inventario disponible:\n"
-        f"{json.dumps(inventory, ensure_ascii=False)}\n\n"
-        "Guion de la escena:\n"
-        f"{scene_text}"
-    )
+# 4. Endpoint principal
+@app.post("/analyze-scene")
+async def analyze_scene_endpoint(payload: ScenePayload):
     try:
-        return await _run_agent(root_agent, prompt)
-    except Exception as error:
-        if "no longer available" not in str(error):
-            raise
-        return await _run_agent(fallback_agent, prompt)
-
-def main() -> None:
-    payload = json.loads(sys.stdin.read())
-    result = asyncio.run(analyze_scene(payload["sceneText"], payload["inventory"]))
-    print(json.dumps(result, ensure_ascii=False))
+        result = await run_pipeline(payload.sceneText, payload.inventory)
+        return {"status": "success", "data": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as error:
-        print(json.dumps({"error": str(error)}, ensure_ascii=False))
-        sys.exit(1)
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

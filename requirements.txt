@@ -1,0 +1,9 @@
+clickhouse-connect
+pydantic
+fastapi
+uvicorn
+google-genai
+clickhouse-connect
+fastapi
+google-genai
+pydantic
