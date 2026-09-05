@@ -279,14 +279,14 @@ function AnalysisReport({ analysis }: { analysis: SceneAnalysis }) {
               style={{
                 margin: 0,
                 fontSize: "1.1rem",
-                color: judge.is_approved ? "#10B981" : "#EF4444",
+                color: "#000000",
               }}
             >
               {judge.is_approved
                 ? "PRODUCER VERDICT: APPROVED"
                 : "PRODUCER VERDICT: BUDGET REJECTED"}
             </h3>
-            <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>
+            <span style={{ fontSize: "0.85rem", color: "#000000", opacity: 0.8 }}>
               Google ADK Judge Agent
             </span>
           </div>
