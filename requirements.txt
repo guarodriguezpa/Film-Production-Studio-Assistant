@@ -7,3 +7,4 @@ clickhouse-connect
 fastapi
 google-genai
 pydantic
+google-adk
