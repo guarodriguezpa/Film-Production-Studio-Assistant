@@ -1,28 +1,29 @@
 # 🎬 Agentic Cinema - AI Film Production Assistant
 
-An AI-powered multi-agent workflow designed to streamline film production planning. This system automatically analyzes screenplays, extracts required physical assets, and cross-references them with live inventory data to compute production budgets in real-time.
+An AI-powered multi-agent workflow built with the Google Agent Development Kit (ADK) to streamline film production planning. This system automatically analyzes screenplays, extracts required physical assets, cross-references them with live inventory data, and enforces business logic like budget limits and continuity checks in real-time.
 
 ## 🚀 Key Features
 
-* **AI Scene Breakdown (Agent 1):** Utilizes the Gemini API to intelligently ingest raw screenplay text (like our Billy test scene) and extract every prop, wardrobe item, and set piece required.
-* **Real-Time Inventory Sync (Agent 2):** Connects directly to **ClickHouse** to query live physical inventory, checking stock levels, repair status, and rental categories.
-* **Dynamic Budget Calculation:** Automatically computes the total daily rental budget for the scene based on the availability and pricing of the extracted items.
-* **Multi-Agent Architecture:** A seamless handoff between a Node.js/Express backend and a Python-powered analytical engine.
+* **AI Scene Breakdown (Extractor Agent):** Utilizes the Gemini API via Google ADK to intelligently ingest raw screenplay text and extract every prop, wardrobe item, and set piece required.
+* **Real-Time Inventory Sync (Inventory Agent):** Connects directly to ClickHouse Cloud to query live physical inventory, verifying stock levels, repair statuses, and rental pricing in milliseconds.
+* **Automated Business Logic (Judge Agent):** Evaluates the extracted data against strict production rules, automatically flagging continuity warnings (e.g., missing holsters for weapons) and enforcing daily budget caps.
+* **Dynamic Budget Calculation:** Automatically computes the total daily rental budget for the scene based on database availability.
+* **Multi-Agent Architecture:** A seamless, serverless handoff between specialized AI agents orchestrated entirely in Python.
 
 ## 🛠️ Tech Stack
 
-* **Database:** ClickHouse Cloud (High-speed inventory querying)
-* **AI / LLM:** Google Gemini API (Scene analysis and extraction)
-* **Backend:** Node.js, Express.js, TypeScript, Python
+* **AI / Multi-Agent Framework:** Google Agent Development Kit (ADK), Google Gemini API
+* **Database:** ClickHouse Cloud (High-speed analytical querying)
+* **Backend:** Python, FastAPI
 * **Deployment & Environment:** Replit
 
 ## 🚦 How to Run the App (For Judges)
 
-1. Click the **"Run"** button at the top of this Repl to start the backend server.
-2. Wait a few seconds for the console to display `Server listening port: 3000`.
-3. The web interface will load automatically in the preview window.
+1. Click the **Live Demo link** provided in Devpost, or click the **"Run"** button at the top of this Repl to start the backend server.
+2. Wait a few seconds for the FastAPI server to initialize.
+3. The web interface will load automatically in your browser or Replit preview window.
 4. Paste a screenplay snippet into the input field and click "Analyze".
-5. Watch as the multi-agent system processes the text, queries the ClickHouse database, and generates the final dashboard and budget!
+5. Watch as the multi-agent system processes the text, queries the ClickHouse database, and generates the final dashboard with the Judge Agent's budget and continuity verdict!
 
 ---
 *Built for the Agentic Cinema: The Blockbuster Hackathon*
