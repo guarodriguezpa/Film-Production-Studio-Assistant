@@ -3,7 +3,8 @@
 An AI-powered multi-agent workflow built with the Google Agent Development Kit (ADK) to streamline film production planning. This system automatically analyzes screenplays, extracts required physical assets, cross-references them with live inventory data, and enforces business logic like budget limits and continuity checks in real-time.
 
 ## 🚀 Key Features
-Raw Screenplay (Input)
+```text
+                            Raw Screenplay (Input)
                                       │
                                       ▼
               ┌───────────────────────────────────────────────┐
@@ -31,6 +32,7 @@ Raw Screenplay (Input)
                                       ▼
                            Agentic Web Dashboard UI
                   (Final Inventory + Judge Recommendations)
+```
 
 * **AI Scene Breakdown (Extractor Agent):** Utilizes the Gemini API via Google ADK to intelligently ingest raw screenplay text and extract every prop, wardrobe item, and set piece required.
 * **Real-Time Inventory Sync (Inventory Agent):** Connects directly to ClickHouse Cloud to query live physical inventory, verifying stock levels, repair statuses, and rental pricing in milliseconds.
