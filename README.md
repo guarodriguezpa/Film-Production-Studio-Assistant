@@ -1,8 +1,26 @@
 # 🎬 Agentic Cinema - AI Film Production Assistant
 
-An AI-powered multi-agent workflow built with the Google Agent Development Kit (ADK) to streamline film production planning. This system automatically analyzes screenplays, extracts required physical assets, cross-references them with live inventory data, and enforces business logic like budget limits and continuity checks in real-time.
+**Every day, film crews lose countless hours to manual administrative bottlenecks.** "Script breakdowns" are traditionally done by hand on static spreadsheets, leading to continuity errors and budget miscalculations. 
+
+**Agentic Cinema** is an autonomous multi-agent platform built with the Google Agent Development Kit (ADK) that bridges natural language screenplays with real-time inventory, financial analytics, and production logic. It gives filmmakers their time back to focus on what actually matters: storytelling.
+
+## 👥 Who is this for?
+
+* **Line Producers:** Automatically generate daily rental budgets without manual data entry.
+* **Prop Masters:** Instantly cross-reference script requirements with live warehouse inventory.
+* **Script Supervisors:** Catch continuity errors (e.g., missing items between scenes) before the cameras even roll.
 
 ## 🚀 Key Features
+
+* **AI Scene Breakdown (Extractor Agent):** Utilizes the Gemini API via Google ADK to intelligently ingest raw screenplay text and extract every prop, wardrobe item, and set piece required.
+* **Real-Time Inventory Sync (Inventory Agent):** Connects directly to ClickHouse Cloud to query live physical inventory, verifying stock levels, repair statuses, and rental pricing in milliseconds.
+* **Automated Business Logic (Judge Agent):** Evaluates the extracted data against strict production rules, automatically flagging continuity warnings and enforcing daily budget caps.
+* **Multi-Agent Architecture:** A seamless, serverless handoff between specialized AI agents orchestrated entirely in Python.
+
+## 🧠 Platform Architecture
+
+Agentic Cinema follows a serverless multi-agent pipeline where an Orchestrator manages the flow between specialized sub-agents and database skills.
+
 ```text
                             Raw Screenplay (Input)
                                       │
@@ -33,12 +51,6 @@ An AI-powered multi-agent workflow built with the Google Agent Development Kit (
                            Agentic Web Dashboard UI
                   (Final Inventory + Judge Recommendations)
 ```
-
-* **AI Scene Breakdown (Extractor Agent):** Utilizes the Gemini API via Google ADK to intelligently ingest raw screenplay text and extract every prop, wardrobe item, and set piece required.
-* **Real-Time Inventory Sync (Inventory Agent):** Connects directly to ClickHouse Cloud to query live physical inventory, verifying stock levels, repair statuses, and rental pricing in milliseconds.
-* **Automated Business Logic (Judge Agent):** Evaluates the extracted data against strict production rules, automatically flagging continuity warnings (e.g., missing holsters for weapons) and enforcing daily budget caps.
-* **Dynamic Budget Calculation:** Automatically computes the total daily rental budget for the scene based on database availability.
-* **Multi-Agent Architecture:** A seamless, serverless handoff between specialized AI agents orchestrated entirely in Python.
 
 ## 🛠️ Tech Stack
 
